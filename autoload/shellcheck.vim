@@ -1,51 +1,72 @@
-let s:save_cpo = &cpo "{{{
-set cpo&vim "}}}
+let s:save_cpo = &cpoptions
+set cpoptions&vim
+
+function! s:getErrorsForLine(lineno)
+  let l:codes = []
+
+  if exists('b:syntastic_private_messages')
+    if a:lineno < len(b:syntastic_private_messages)
+      for l:msg in b:syntastic_private_messages[a:lineno]
+        let l:codes += [matchstr(msg.text, '\[\zsSC[0-9]\+\ze\]$', 0, 1)]
+      endfor
+    endif
+
+  elseif exists('b:ale_highlight_items')
+    for l:item in b:ale_highlight_items
+      if l:item['linter_name'] ==? 'shellcheck' && str2nr(l:item['lnum']) == a:lineno
+        let l:codes += [l:item['code']]
+      endif
+    endfor
+
+  else
+    " TODO: run shellcheck directly
+    throw 'no supported linting plugin detected'
+  endif
+
+  return l:codes
+endfunction
 
 function! shellcheck#SuppressWarnings()
-  let codes = {}
+  let l:lineno = line('.')
+  let l:prev_lineno = l:lineno - 1
+  let l:prev_line = getline(l:prev_lineno)
+
   try
-    let cur_messages = b:syntastic_private_messages[line(".")]
+    let l:codes = s:getErrorsForLine(l:lineno)
   catch
-    let cur_messages = []
+    echom 'shellcheck.vim: ' . v:exception
+    return
   endtry
-  for message in cur_messages
-    let code = matchstr(message.text, '\[\zsSC[0-9]\+\ze\]$', 0, 1)
-    let codes[code] = message.text
-    if code == "SC2148"
-      call append(0, "#!/bin/bash")
-      return
-    endif
-  endfor
 
-  let suppressCodes = []
-  for code in keys(codes)
-    " let ret = input(codes[code]." <- Suppress? [Y/n]: ")
-    let ret = "y"
-    if tolower(ret[0]) != "n"
-      let suppressCodes = add(suppressCodes, code)
-    endif
-  endfor
+  if len(l:codes) == 0
+    return
+  endif
 
-  if !empty(suppressCodes)
-    let prev_lineno = line(".") - 1
-    let prev_line = getline(prev_lineno)
-    if matchstr(prev_line, "#.*shellcheck") == ""
-      let newline = getline(".")[0:(indent(".")-1)] ."# shellcheck disable=". join(suppressCodes, ",")
-      call append(prev_lineno, newline)
-    else
-      let line_parse = matchlist(prev_line, '\(.*#.*shellcheck.*\)\(\sdisable=\)\([SC0-9,]*\)\(.*\)')
-      let line_head = line_parse[1]
-      let line_code = line_parse[3]
-      let line_tail = line_parse[4]
-      let currrent_disable_codes = split(line_code, ",")
-      if !empty(currrent_disable_codes)
-        let suppressCodes = uniq(sort(extend(suppressCodes, currrent_disable_codes)))
-      endif
-      let newline = line_head ." disable=". join(suppressCodes, ",") . line_tail
-      call setline(prev_lineno, newline)
+  let l:line_parsed = matchlist(l:prev_line, '\(.*#.*shellcheck.*\)\%(\s\+disable=\)\(\%(\S*\)\%(,\S*\)*\)\(.*\)')
+
+  if len(l:line_parsed) >= 4
+    let l:line_head = l:line_parsed[1]
+    let l:line_codes = l:line_parsed[2]
+    let l:line_tail = l:line_parsed[3]
+
+    let l:joined_codes = extend(l:codes, split(l:line_codes, ','))
+    let l:normalised_codes = map(l:joined_codes, { _, c -> substitute(c, '^\(SC\)\?', 'SC', '') })
+    let l:disable_codes = uniq(sort(l:normalised_codes))
+
+    let l:newline = l:line_head . ' disable=' . join(l:disable_codes, ',') . l:line_tail
+    call setline(l:prev_lineno, l:newline)
+
+  else
+    let l:newline = '# shellcheck disable=' . join(l:codes, ',')
+    let l:indent = indent('.')
+
+    if l:indent > 0
+      let l:newline = getline('.')[0:(l:indent - 1)] . l:newline
     endif
+
+    call append(l:prev_lineno, newline)
   endif
 endfunction
 
-let &cpo = s:save_cpo "{{{
-unlet s:save_cpo "}}}
+let &cpoptions = s:save_cpo
+unlet s:save_cpo

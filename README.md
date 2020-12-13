@@ -2,14 +2,28 @@
 
 ## Install
 
+Requires either ALE or Syntastic to be installed and configured for shellcheck.
+
 ```vim
-NeoBundle 'kawaz/shellcheck.vim', {'depends': ['scrooloose/syntastic']}
+" Dein
+call dein#add('b0o/shellcheck.vim')
+
+" NeoBundle
+NeoBundle 'b0o/shellcheck.vim'
 ```
 
 ## Commands
 
-- `:ShellcheckSuppressWarnings` - Suppress warnings on current line. It support range.
+- `:ShellcheckSuppressWarnings` - Suppress all warnings for the current line.
 
-## Contact
-Twitter:  [@kawaz](https://twitter.com/kawaz)
-Email:    [kawazzz@gmail.com](mailto:kawazzz@gmail.com)
+## Credit
+
+Based on [shellcheck.vim](https://github.com/kawaz/shellcheck.vim) by [@kawaz](https://twitter.com/kawaz).
+
+## TODO
+
+- [ ] Support running shellcheck directly without the use of ALE/Syntastic
+
+## License
+
+MIT License
