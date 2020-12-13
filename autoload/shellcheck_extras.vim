@@ -26,7 +26,7 @@ function! s:getErrorsForLine(lineno)
   return l:codes
 endfunction
 
-function! shellcheck#SuppressWarnings()
+function! shellcheck_extras#SuppressWarnings()
   let l:lineno = line('.')
   let l:prev_lineno = l:lineno - 1
   let l:prev_line = getline(l:prev_lineno)
